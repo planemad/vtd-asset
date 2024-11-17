@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Vattavada Panchayat - Resource Map (2022)</title>
+    
+    <!-- Mapbox GL JS CSS and JavaScript -->
+    <link href='https://api.mapbox.com/mapbox-gl-js/v3.8.0/mapbox-gl.css' rel='stylesheet' />
+    <script src='https://api.mapbox.com/mapbox-gl-js/v3.8.0/mapbox-gl.js'></script>
+    
+    <!-- Add Mapbox GL Geocoder for search functionality -->
+    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.min.js"></script>
+    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.css">
+    
+    <style>
+        body { 
+            margin: 0; 
+            padding: 0; 
+        }
+        #map { 
+            position: absolute; 
+            top: 0; 
+            bottom: 0; 
+            width: 100%; 
+        }
+        .info {
+            padding: 6px 8px;
+            font: 14px/16px Arial, Helvetica, sans-serif;
+            background: white;
+            background: rgba(255,255,255,0.8);
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            border-radius: 5px;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+        }
+        .abstract {
+            padding: 6px 8px;
+            font: 14px/16px Arial, Helvetica, sans-serif;
+            background: white;
+            background: rgba(255,255,255,0.8);
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            border-radius: 5px;
+            position: absolute;
+            bottom: 20px;
+            left: 10px;
+            max-width: 300px;
+            z-index: 1000;
+        }
+        .mapboxgl-popup {
+            max-width: 400px;
+            font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+        }
+        
+        .legend {
+            background-color: #fff;
+            border-radius: 3px;
+            bottom: 30px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+            padding: 10px;
+            position: absolute;
+            right: 10px;
+            z-index: 1;
+        }
+        
+        .legend h4 {
+            margin: 0 0 10px;
+        }
+        
+        .legend div span {
+            border-radius: 50%;
+            display: inline-block;
+            height: 10px;
+            margin-right: 5px;
+            width: 10px;
+        }
+        .mapboxgl-ctrl-terrain {
+            padding: 5px 10px;
+            margin: 10px;
+            border: none;
+            border-radius: 4px;
+            background-color: #fff;
+            box-shadow: 0 0 0 2px rgba(0,0,0,.1);
+            cursor: pointer;
+        }
+
+        .mapboxgl-ctrl-terrain:hover {
+            background-color: #f8f8f8;
+        }
+
+        .mapboxgl-ctrl-scale {
+            margin-top: 50px !important;
+        }
+
+        .mapboxgl-ctrl-osm {
+            padding: 5px 10px;
+            margin: 10px;
+            border: none;
+            border-radius: 4px;
+            background-color: #fff;
+            box-shadow: 0 0 0 2px rgba(0,0,0,.1);
+            cursor: pointer;
+        }
+
+        .mapboxgl-ctrl-osm:hover {
+            background-color: #f8f8f8;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div class="info">
+        <h2>Vattavada Panchayat - Resource Map (2022)</h2>
+    </div>
+    <div class="abstract">
+        This webmap is a product of fieldwork conducted by 2021-23 batch of Department of Geography, SSUS Kalady, Ernakulam, under the supervision of Dr. Suresh S in October 2022. Data compilation and map design was done by Sreevisal G , Arya R & Abhilash Sreekumar
+    </div>
+
+    <div id="legend" class="legend">
+        <h4>Legend</h4>
+        <!-- Legend content will be populated dynamically -->
+    </div>
+
+    <script>
+        mapboxgl.accessToken = 'pk.eyJ1IjoicGxhbmVtYWQiLCJhIjoiY2x2MzZwbGRyMGdheDJtbXVwdDA4aDNyaCJ9.nbvz6aNGQo68xa4NtWH26A';
+        
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/satellite-streets-v12',
+            center: [77.25776, 10.20212],
+            zoom: 13,
+            pitch: 49,
+            bearing: 10.4,
+            hash: true
+        });
+
+        map.on('style.load', () => {
+            // Add OSM source and layer
+            map.addSource('osm', {
+                'type': 'raster',
+                'tiles': ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                'tileSize': 256,
+                'attribution': '© OpenStreetMap contributors'
+            });
+            
+            map.addLayer({
+                'id': 'osm-layer',
+                'type': 'raster',
+                'source': 'osm',
+                'layout': {
+                    'visibility': 'none'  // Hidden by default
+                }
+            });  // Insert before your custom layers
+            
+            // Add terrain source (your existing code)
+            map.addSource('mapbox-dem', {
+                'type': 'raster-dem',
+                'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
+                'tileSize': 512,
+                'maxzoom': 14
+            });
+            
+            map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.5 });
+        });
+
+        // Function to fetch and process JS files containing GeoJSON
+        async function fetchGeoJSON(url) {
+            try {
+                const response = await fetch(url);
+                const text = await response.text();
+                // Extract the GeoJSON object from the variable declaration
+                const jsonStr = text.substring(text.indexOf('=') + 1).trim();
+                return JSON.parse(jsonStr);
+            } catch (error) {
+                console.error('Error fetching GeoJSON:', error);
+                return null;
+            }
+        }
+
+        map.on('load', async () => {
+            // Define data sources with their corresponding variable names
+            const sources = [
+                {
+                    id: 'boundary',
+                    url: 'https://sreevisal.github.io/vtd-asset/data/Boundary_2.js',
+                    varName: 'json_Boundary_2'
+                },
+                {
+                    id: 'ward-boundary',
+                    url: 'https://sreevisal.github.io/vtd-asset/data/WardBoundary_3.js',
+                    varName: 'json_WardBoundary_3'
+                },
+                {
+                    id: 'streams',
+                    url: 'https://sreevisal.github.io/vtd-asset/data/Streams_4.js',
+                    varName: 'json_Streams_4'
+                },
+                {
+                    id: 'locations',
+                    url: 'https://sreevisal.github.io/vtd-asset/data/Locations_5.js',
+                    varName: 'json_Locations_5'
+                },
+                {
+                    id: 'roads',
+                    url: 'https://sreevisal.github.io/vtd-asset/data/Roads_6.js',
+                    varName: 'json_Roads_6'
+                },
+                {
+                    id: 'resources',
+                    url: 'https://sreevisal.github.io/vtd-asset/data/Resources_7.js',
+                    varName: 'json_Resources_7'
+                }
+            ];
+
+            // Load all data sources
+            for (const source of sources) {
+                try {
+                    const geojson = await fetchGeoJSON(source.url);
+                    if (geojson) {
+                        map.addSource(source.id, {
+                            type: 'geojson',
+                            data: geojson
+                        });
+                    }
+                } catch (error) {
+                    console.error(`Error loading ${source.id}:`, error);
+                }
+            }
+
+            // Add boundary layer
+            if (map.getSource('boundary')) {
+                map.addLayer({
+                    'id': 'boundary-layer',
+                    'type': 'line',
+                    'source': 'boundary',
+                    'layout': {},
+                    'paint': {
+                        'line-color': 'rgba(0,0,0,1.0)',
+                        'line-width': 3
+                    }
+                });
+            }
+
+            // Add ward boundary layer
+            if (map.getSource('ward-boundary')) {
+                map.addLayer({
+                    'id': 'ward-boundary-layer',
+                    'type': 'fill',
+                    'source': 'ward-boundary',
+                    'paint': {
+                        'fill-color': [
+                            'match',
+                            ['get', 'Ward Name'],
+                            'Chilanthiyar', 'rgba(252,184,192,1.0)',
+                            'Kadavari', 'rgba(252,219,214,1.0)',
+                            // Add other ward colors here
+                            'rgba(165,231,134,1.0)' // default color
+                        ],
+                        'fill-opacity': 0.7,
+                        'fill-outline-color': 'rgba(0,35,35,1.0)'
+                    }
+                });
+            }
+
+            // Add streams layer
+            if (map.getSource('streams')) {
+                map.addLayer({
+                    'id': 'streams-layer',
+                    'type': 'line',
+                    'source': 'streams',
+                    'paint': {
+                        'line-color': [
+                            'match',
+                            ['get', 'ORDER1'],
+                            '5', 'rgba(0,162,255,1.0)',
+                            '4', 'rgba(0,162,255,1.0)',
+                            'rgba(143,199,255,1.0)'
+                        ],
+                        'line-width': [
+                            'match',
+                            ['get', 'ORDER1'],
+                            '5', 2,
+                            1
+                        ]
+                    }
+                });
+            }
+
+            // Add roads layer
+            if (map.getSource('roads')) {
+                map.addLayer({
+                    'id': 'roads-layer',
+                    'type': 'line',
+                    'source': 'roads',
+                    'paint': {
+                        'line-color': 'rgba(203,49,108,1.0)',
+                        'line-width': 3
+                    }
+                });
+            }
+
+            // Add resources layer
+            if (map.getSource('resources')) {
+                map.addLayer({
+                    'id': 'resources-layer',
+                    'type': 'circle',
+                    'source': 'resources',
+                    'paint': {
+                        'circle-radius': 5,
+                        'circle-color': [
+                            'match',
+                            ['get', 'Category'],
+                            'School', 'rgba(208,115,90,1.0)',
+                            'Hospital', 'rgba(235,105,109,1.0)',
+                            // Add other category colors here
+                            'rgba(165,231,134,1.0)' // default color
+                        ],
+                        'circle-stroke-width': 2,
+                        'circle-stroke-color': 'rgba(50,87,128,1.0)'
+                    }
+                });
+            }
+
+            // Add popups
+            const popup = new mapboxgl.Popup({
+                closeButton: false,
+                closeOnClick: false
+            });
+
+            map.on('mouseenter', 'resources-layer', (e) => {
+                map.getCanvas().style.cursor = 'pointer';
+                
+                const coordinates = e.features[0].geometry.coordinates.slice();
+                const properties = e.features[0].properties;
+                
+                // Transform the photo path
+                const photoPath = properties.Photos ? properties.Photos
+                    .replace(/\\/g, '_')
+                    .replace(/:/g, '_')
+                    .replace(/ /g, '%20')
+                    : null;
+                
+                const popupContent = `
+                    <strong>${properties.Name}</strong><br>
+                    Category: ${properties.Category}<br>
+                    ${properties.Date ? `Date: ${properties.Date}<br>` : ''}
+                    ${photoPath ? `<img src="./images/${photoPath}" style="max-width:200px;">` : ''}
+                `;
+
+                popup.setLngLat(coordinates)
+                    .setHTML(popupContent)
+                    .addTo(map);
+            });
+
+            map.on('mouseleave', 'resources-layer', () => {
+                map.getCanvas().style.cursor = '';
+                popup.remove();
+            });
+
+            // Keep the click event for persistent popups
+            map.on('click', 'resources-layer', (e) => {
+                const coordinates = e.features[0].geometry.coordinates.slice();
+                const properties = e.features[0].properties;
+                
+                const photoPath = properties.Photos ? properties.Photos
+                    .replace(/\\/g, '_')
+                    .replace(/:/g, '_')
+                    .replace(/ /g, '%20')
+                    : null;
+                
+                const popupContent = `
+                    <strong>${properties.Name}</strong><br>
+                    Category: ${properties.Category}<br>
+                    ${properties.Date ? `Date: ${properties.Date}<br>` : ''}
+                    ${photoPath ? `<img src="./images/${photoPath}" style="max-width:200px;">` : ''}
+                `;
+
+                new mapboxgl.Popup()
+                    .setLngLat(coordinates)
+                    .setHTML(popupContent)
+                    .addTo(map);
+            });
+        });
+
+        // Add navigation controls
+        map.addControl(new mapboxgl.NavigationControl());
+
+        // Add scale control
+        map.addControl(new mapboxgl.ScaleControl({
+            maxWidth: 80,
+            unit: 'metric'
+        }), 'top-left');
+
+        // Add search control
+        map.addControl(
+            new MapboxGeocoder({
+                accessToken: mapboxgl.accessToken,
+                mapboxgl: mapboxgl,
+                marker: false,
+                placeholder: 'Search for places',
+                collapsed: true
+            })
+        );
+
+        // Add layer toggle controls
+        const toggleableLayers = [
+            { id: 'boundary-layer', name: 'Boundary' },
+            { id: 'ward-boundary-layer', name: 'Ward Boundary' },
+            { id: 'streams-layer', name: 'Streams' },
+            { id: 'roads-layer', name: 'Roads' },
+            { id: 'resources-layer', name: 'Resources' }
+        ];
+
+        const layerList = document.createElement('div');
+        layerList.className = 'layer-list';
+
+        toggleableLayers.forEach(layer => {
+            const link = document.createElement('a');
+            link.href = '#';
+            link.className = 'active';
+            link.textContent = layer.name;
+
+            link.onclick = function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const visibility = map.getLayoutProperty(layer.id, 'visibility');
+
+                if (visibility === 'visible') {
+                    map.setLayoutProperty(layer.id, 'visibility', 'none');
+                    this.className = '';
+                } else {
+                    this.className = 'active';
+                    map.setLayoutProperty(layer.id, 'visibility', 'visible');
+                }
+            };
+
+            layerList.appendChild(link);
+        });
+
+        document.body.appendChild(layerList);
+
+        const terrainControl = document.createElement('button');
+        terrainControl.className = 'mapboxgl-ctrl-terrain mapboxgl-ctrl-group mapboxgl-ctrl';
+        terrainControl.innerHTML = '3D';
+        terrainControl.onclick = () => {
+            const currentTerrain = map.getTerrain();
+            if (currentTerrain) {
+                map.setTerrain(null);
+                terrainControl.style.backgroundColor = '#fff';
+            } else {
+                map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.5 });
+                terrainControl.style.backgroundColor = '#ddd';
+            }
+        };
+        map.getContainer().appendChild(terrainControl);
+
+        // Add OSM toggle control
+        const osmControl = document.createElement('button');
+        osmControl.className = 'mapboxgl-ctrl-osm mapboxgl-ctrl-group mapboxgl-ctrl';
+        osmControl.innerHTML = 'OSM';
+        osmControl.onclick = () => {
+            const visibility = map.getLayoutProperty('osm-layer', 'visibility');
+            if (visibility === 'visible') {
+                map.setLayoutProperty('osm-layer', 'visibility', 'none');
+                osmControl.style.backgroundColor = '#fff';
+            } else {
+                map.setLayoutProperty('osm-layer', 'visibility', 'visible');
+                osmControl.style.backgroundColor = '#ddd';
+            }
+        };
+        map.getContainer().appendChild(osmControl);
+    </script>
+</body>
+</html>
