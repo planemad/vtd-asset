@@ -1,0 +1,112 @@
+{
+    "layers": [
+        {
+            "file": "Boundary_2.js",
+            "varName": "json_Boundary_2",
+            "style": {
+                "type": "line",
+                "paint": {
+                    "line-color": "#000000",
+                    "line-width": 2
+                }
+            },
+            "popup": {
+                "title": "Boundary",
+                "properties": ["name", "area"]
+            }
+        },
+        {
+            "file": "WardBoundary_3.js",
+            "varName": "json_WardBoundary_3",
+            "style": {
+                "type": "fill",
+                "paint": {
+                    "fill-color": [
+                        "match",
+                        ["get", "Ward No"],
+                        "1", "#7B3F00",
+                        "2", "#FF6B6B",
+                        "3", "#4ECDC4",
+                        "4", "#9B59B6",
+                        "5", "#2ECC71",
+                        "6", "#F1C40F",
+                        "7", "#E74C3C",
+                        "8", "#3498DB",
+                        "9", "#1ABC9C",
+                        "10", "#D35400",
+                        "11", "#8E44AD",
+                        "12", "#16A085",
+                        "13", "#C0392B",
+                        "#088"
+                    ],
+                    "fill-opacity": 0.3,
+                    "fill-outline-color": "#fff"
+                }
+            },
+            "popup": {
+                "title": "Ward",
+                "properties": ["ward_no", "ward_name"]
+            }
+        },
+        {
+            "file": "Streams_4.js",
+            "varName": "json_Streams_4",
+            "style": {
+                "type": "line",
+                "paint": {
+                    "line-color": "#0066cc",
+                    "line-width": [
+                        "match",
+                        ["get", "ORDER1"],
+                        1, 2,
+                        2, 4,
+                        3, 5,
+                        4, 8,
+                        2
+                    ]
+                }
+            }
+        },
+        {
+            "file": "Locations_5.js",
+            "varName": "json_Locations_5",
+            "style": {
+                "type": "circle",
+                "paint": {
+                    "circle-radius": 6,
+                    "circle-color": "#ff0000",
+                    "circle-stroke-width": 1,
+                    "circle-stroke-color": "#fff"
+                }
+            }
+        },
+        {
+            "file": "Roads_6.js",
+            "varName": "json_Roads_6",
+            "style": {
+                "type": "line",
+                "paint": {
+                    "line-color": "#666666",
+                    "line-width": 1.5
+                }
+            }
+        },
+        {
+            "file": "Resources_7.js",
+            "varName": "json_Resources_7",
+            "style": {
+                "type": "circle",
+                "paint": {
+                    "circle-radius": 5,
+                    "circle-color": "#00ff00",
+                    "circle-stroke-width": 1,
+                    "circle-stroke-color": "#fff"
+                }
+            },
+            "popup": {
+                "template": "<div class='resource-popup'><h3>{name}</h3><img src='Photos/{photo}' alt='{name}' style='width:100%; max-width:300px; height:auto; margin:10px 0;'/></div>",
+                "properties": ["name", "photo"]
+            }
+        }
+    ]
+} 

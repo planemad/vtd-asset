@@ -180,209 +180,202 @@
             }
         }
 
-        map.on('load', async () => {
-            // Define data sources with their corresponding variable names
-            const sources = [
-                {
-                    id: 'boundary',
-                    url: 'https://sreevisal.github.io/vtd-asset/data/Boundary_2.js',
-                    varName: 'json_Boundary_2'
-                },
-                {
-                    id: 'ward-boundary',
-                    url: 'https://sreevisal.github.io/vtd-asset/data/WardBoundary_3.js',
-                    varName: 'json_WardBoundary_3'
-                },
-                {
-                    id: 'streams',
-                    url: 'https://sreevisal.github.io/vtd-asset/data/Streams_4.js',
-                    varName: 'json_Streams_4'
-                },
-                {
-                    id: 'locations',
-                    url: 'https://sreevisal.github.io/vtd-asset/data/Locations_5.js',
-                    varName: 'json_Locations_5'
-                },
-                {
-                    id: 'roads',
-                    url: 'https://sreevisal.github.io/vtd-asset/data/Roads_6.js',
-                    varName: 'json_Roads_6'
-                },
-                {
-                    id: 'resources',
-                    url: 'https://sreevisal.github.io/vtd-asset/data/Resources_7.js',
-                    varName: 'json_Resources_7'
-                }
-            ];
+        let sources = [];
 
-            // Load all data sources
-            for (const source of sources) {
-                try {
-                    const geojson = await fetchGeoJSON(source.url);
-                    if (geojson) {
-                        map.addSource(source.id, {
-                            type: 'geojson',
-                            data: geojson
+        // Fetch the manifest and generate sources
+        async function initializeSources() {
+            try {
+                const response = await fetch('./data/manifest.json');
+                const manifest = await response.json();
+                
+                sources = manifest.layers.map(layer => ({
+                    id: layer.file.split('_')[0].toLowerCase(),
+                    url: `./data/${layer.file}`,
+                    varName: layer.varName,
+                    style: layer.style
+                }));
+                
+                // Load all data sources
+                for (const source of sources) {
+                    try {
+                        const geojson = await fetchGeoJSON(source.url);
+                        if (geojson) {
+                            map.addSource(source.id, {
+                                type: 'geojson',
+                                data: geojson
+                            });
+                        }
+                    } catch (error) {
+                        console.error(`Error loading ${source.id}:`, error);
+                    }
+                }
+                
+                // Add layers after all sources are loaded
+                addMapLayers();
+            } catch (error) {
+                console.error('Error loading manifest:', error);
+            }
+        }
+
+        // Move your layer addition logic to a separate function
+        function addMapLayers() {
+            sources.forEach(source => {
+                const layerId = `${source.id}-layer`;
+                
+                if (map.getSource(source.id)) {
+                    map.addLayer({
+                        'id': layerId,
+                        'type': source.style.type,
+                        'source': source.id,
+                        'layout': {
+                            'visibility': 'visible'
+                        },
+                        'paint': source.style.paint
+                    });
+                    console.log(`Added layer: ${layerId}`); // Debug log
+                } else {
+                    console.warn(`Source not found: ${source.id}`); // Debug log
+                }
+            });
+        }
+
+        // Replace the static toggleableLayers with dynamic generation
+        async function initializeToggleableLayers() {
+            try {
+                const response = await fetch('./data/manifest.json');
+                const manifest = await response.json();
+                
+                const toggleableLayers = manifest.layers.map(layer => {
+                    const layerName = layer.file.split('_')[0];
+                    return {
+                        id: `${layerName.toLowerCase()}-layer`,
+                        name: layerName.replace(/([A-Z])/g, ' $1').trim() // Add spaces before capital letters
+                    };
+                });
+
+                // Create layer toggles
+                const layerList = document.createElement('div');
+                layerList.className = 'layer-list';
+
+                toggleableLayers.forEach(layer => {
+                    const link = document.createElement('a');
+                    link.href = '#';
+                    link.className = 'active';
+                    link.textContent = layer.name;
+
+                    link.onclick = function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        const visibility = map.getLayoutProperty(layer.id, 'visibility');
+
+                        if (visibility === 'visible') {
+                            map.setLayoutProperty(layer.id, 'visibility', 'none');
+                            this.className = '';
+                        } else {
+                            this.className = 'active';
+                            map.setLayoutProperty(layer.id, 'visibility', 'visible');
+                        }
+                    };
+
+                    layerList.appendChild(link);
+                });
+
+                document.body.appendChild(layerList);
+            } catch (error) {
+                console.error('Error loading manifest for toggleable layers:', error);
+            }
+        }
+
+        // Create a popup but don't add it to the map yet
+        const popup = new mapboxgl.Popup({
+            closeButton: false,
+            closeOnClick: false
+        });
+
+        function addPopupInteractions() {
+            sources.forEach(source => {
+                const layerId = `${source.id}-layer`;
+                
+                // Handle mouse enter
+                map.on('mouseenter', layerId, (e) => {
+                    map.getCanvas().style.cursor = 'pointer';
+                    
+                    if (e.features.length > 0) {
+                        const feature = e.features[0];
+                        
+                        // Build popup content
+                        let html;
+                        if (source.popup?.template) {
+                            // Use template if provided
+                            html = source.popup.template;
+                            // Replace placeholders with actual values
+                            source.popup.properties.forEach(prop => {
+                                const value = feature.properties[prop] || '';
+                                html = html.replace(`{${prop}}`, value);
+                            });
+                        } else if (source.popup?.properties) {
+                            // Fall back to default property listing
+                            html = `<h4>${source.popup?.title || source.id}</h4>`;
+                            source.popup.properties.forEach(prop => {
+                                if (feature.properties[prop]) {
+                                    const displayName = prop
+                                        .split('_')
+                                        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                                        .join(' ');
+                                    html += `<strong>${displayName}:</strong> ${feature.properties[prop]}<br>`;
+                                }
+                            });
+                        }
+                        
+                        // Position the popup at the mouse pointer
+                        if (html) {
+                            popup
+                                .setLngLat(e.lngLat)
+                                .setHTML(html)
+                                .addTo(map);
+                        }
+                    }
+                });
+
+                // Handle mouse leave
+                map.on('mouseleave', layerId, () => {
+                    map.getCanvas().style.cursor = '';
+                    popup.remove();
+                });
+
+                // Handle click - you could show a different/larger popup on click
+                map.on('click', layerId, (e) => {
+                    if (e.features.length > 0) {
+                        const feature = e.features[0];
+                        
+                        // Build popup content - could be more detailed than hover popup
+                        let html = `<h4>${source.popup?.title || source.id}</h4>`;
+                        // Show all properties for clicked features
+                        Object.entries(feature.properties).forEach(([key, value]) => {
+                            if (value) {
+                                const displayName = key
+                                    .split('_')
+                                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                                    .join(' ');
+                                html += `<strong>${displayName}:</strong> ${value}<br>`;
+                            }
                         });
-                    }
-                } catch (error) {
-                    console.error(`Error loading ${source.id}:`, error);
-                }
-            }
 
-            // Add boundary layer
-            if (map.getSource('boundary')) {
-                map.addLayer({
-                    'id': 'boundary-layer',
-                    'type': 'line',
-                    'source': 'boundary',
-                    'layout': {},
-                    'paint': {
-                        'line-color': 'rgba(0,0,0,1.0)',
-                        'line-width': 3
+                        new mapboxgl.Popup()
+                            .setLngLat(e.lngLat)
+                            .setHTML(html)
+                            .addTo(map);
                     }
                 });
-            }
-
-            // Add ward boundary layer
-            if (map.getSource('ward-boundary')) {
-                map.addLayer({
-                    'id': 'ward-boundary-layer',
-                    'type': 'fill',
-                    'source': 'ward-boundary',
-                    'paint': {
-                        'fill-color': [
-                            'match',
-                            ['get', 'Ward Name'],
-                            'Chilanthiyar', 'rgba(252,184,192,1.0)',
-                            'Kadavari', 'rgba(252,219,214,1.0)',
-                            // Add other ward colors here
-                            'rgba(165,231,134,1.0)' // default color
-                        ],
-                        'fill-opacity': 0.7,
-                        'fill-outline-color': 'rgba(0,35,35,1.0)'
-                    }
-                });
-            }
-
-            // Add streams layer
-            if (map.getSource('streams')) {
-                map.addLayer({
-                    'id': 'streams-layer',
-                    'type': 'line',
-                    'source': 'streams',
-                    'paint': {
-                        'line-color': [
-                            'match',
-                            ['get', 'ORDER1'],
-                            '5', 'rgba(0,162,255,1.0)',
-                            '4', 'rgba(0,162,255,1.0)',
-                            'rgba(143,199,255,1.0)'
-                        ],
-                        'line-width': [
-                            'match',
-                            ['get', 'ORDER1'],
-                            '5', 2,
-                            1
-                        ]
-                    }
-                });
-            }
-
-            // Add roads layer
-            if (map.getSource('roads')) {
-                map.addLayer({
-                    'id': 'roads-layer',
-                    'type': 'line',
-                    'source': 'roads',
-                    'paint': {
-                        'line-color': 'rgba(203,49,108,1.0)',
-                        'line-width': 3
-                    }
-                });
-            }
-
-            // Add resources layer
-            if (map.getSource('resources')) {
-                map.addLayer({
-                    'id': 'resources-layer',
-                    'type': 'circle',
-                    'source': 'resources',
-                    'paint': {
-                        'circle-radius': 5,
-                        'circle-color': [
-                            'match',
-                            ['get', 'Category'],
-                            'School', 'rgba(208,115,90,1.0)',
-                            'Hospital', 'rgba(235,105,109,1.0)',
-                            // Add other category colors here
-                            'rgba(165,231,134,1.0)' // default color
-                        ],
-                        'circle-stroke-width': 2,
-                        'circle-stroke-color': 'rgba(50,87,128,1.0)'
-                    }
-                });
-            }
-
-            // Add popups
-            const popup = new mapboxgl.Popup({
-                closeButton: false,
-                closeOnClick: false
             });
+        }
 
-            map.on('mouseenter', 'resources-layer', (e) => {
-                map.getCanvas().style.cursor = 'pointer';
-                
-                const coordinates = e.features[0].geometry.coordinates.slice();
-                const properties = e.features[0].properties;
-                
-                // Transform the photo path
-                const photoPath = properties.Photos ? properties.Photos
-                    .replace(/\\/g, '_')
-                    .replace(/:/g, '_')
-                    .replace(/ /g, '%20')
-                    : null;
-                
-                const popupContent = `
-                    <strong>${properties.Name}</strong><br>
-                    Category: ${properties.Category}<br>
-                    ${properties.Date ? `Date: ${properties.Date}<br>` : ''}
-                    ${photoPath ? `<img src="./images/${photoPath}" style="max-width:200px;">` : ''}
-                `;
-
-                popup.setLngLat(coordinates)
-                    .setHTML(popupContent)
-                    .addTo(map);
-            });
-
-            map.on('mouseleave', 'resources-layer', () => {
-                map.getCanvas().style.cursor = '';
-                popup.remove();
-            });
-
-            // Keep the click event for persistent popups
-            map.on('click', 'resources-layer', (e) => {
-                const coordinates = e.features[0].geometry.coordinates.slice();
-                const properties = e.features[0].properties;
-                
-                const photoPath = properties.Photos ? properties.Photos
-                    .replace(/\\/g, '_')
-                    .replace(/:/g, '_')
-                    .replace(/ /g, '%20')
-                    : null;
-                
-                const popupContent = `
-                    <strong>${properties.Name}</strong><br>
-                    Category: ${properties.Category}<br>
-                    ${properties.Date ? `Date: ${properties.Date}<br>` : ''}
-                    ${photoPath ? `<img src="./images/${photoPath}" style="max-width:200px;">` : ''}
-                `;
-
-                new mapboxgl.Popup()
-                    .setLngLat(coordinates)
-                    .setHTML(popupContent)
-                    .addTo(map);
-            });
+        // Update your map.on('load') handler
+        map.on('load', async () => {
+            await initializeSources();
+            await initializeToggleableLayers();
+            addPopupInteractions();
         });
 
         // Add navigation controls
@@ -404,44 +397,6 @@
                 collapsed: true
             })
         );
-
-        // Add layer toggle controls
-        const toggleableLayers = [
-            { id: 'boundary-layer', name: 'Boundary' },
-            { id: 'ward-boundary-layer', name: 'Ward Boundary' },
-            { id: 'streams-layer', name: 'Streams' },
-            { id: 'roads-layer', name: 'Roads' },
-            { id: 'resources-layer', name: 'Resources' }
-        ];
-
-        const layerList = document.createElement('div');
-        layerList.className = 'layer-list';
-
-        toggleableLayers.forEach(layer => {
-            const link = document.createElement('a');
-            link.href = '#';
-            link.className = 'active';
-            link.textContent = layer.name;
-
-            link.onclick = function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-
-                const visibility = map.getLayoutProperty(layer.id, 'visibility');
-
-                if (visibility === 'visible') {
-                    map.setLayoutProperty(layer.id, 'visibility', 'none');
-                    this.className = '';
-                } else {
-                    this.className = 'active';
-                    map.setLayoutProperty(layer.id, 'visibility', 'visible');
-                }
-            };
-
-            layerList.appendChild(link);
-        });
-
-        document.body.appendChild(layerList);
 
         const terrainControl = document.createElement('button');
         terrainControl.className = 'mapboxgl-ctrl-terrain mapboxgl-ctrl-group mapboxgl-ctrl';
@@ -473,6 +428,33 @@
             }
         };
         map.getContainer().appendChild(osmControl);
+
+        // Add some CSS for the popups
+        const style = document.createElement('style');
+        style.textContent = `
+            .mapboxgl-popup {
+                max-width: 400px;
+                font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+            }
+            .mapboxgl-popup-content {
+                padding: 10px;
+            }
+            .mapboxgl-popup-content h4 {
+                margin: 0 0 5px;
+            }
+            .resource-popup {
+                text-align: center;
+            }
+            .resource-popup h3 {
+                margin: 0 0 10px;
+                color: #333;
+            }
+            .resource-popup img {
+                border-radius: 4px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+        `;
+        document.head.appendChild(style);
     </script>
 </body>
 </html>
